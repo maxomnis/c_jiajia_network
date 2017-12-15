@@ -17,6 +17,7 @@
 #define BUFF_SIZE 1024
 
 /*
+ 测试select io模型
  这个只支持一个客户端
 */
 
