@@ -102,7 +102,7 @@ void et(epoll_event* events, int number, int epollfd, int listenfd)
 		}
 		else if(events[i].events & EPOLLIN)
 		{
-			/*这段代码不会被重复触发，所以我们循环读取数据，以确保把socket读缓存中的说有数据读出*/
+			/*这段代码不会被重复触发，所以我们循环读取数据，以确保把socket读缓存中的所有数据读出*/
 			printf("event trigger once\n");
 			while(1)
 			{
@@ -206,6 +206,7 @@ int main(int argc, char* argv[])
         		应用程序索引就绪文件的效率。
 
         		epoll_wait返回就绪的文件数
+
         	*/
         	int ret = epoll_wait(epollfd, events, MAX_EVENT_NUMBER, -1);
         	if( ret < 0)
@@ -214,7 +215,11 @@ int main(int argc, char* argv[])
         		break;
         	}
 
-        	//体会下两个模式的区别
+       
+       		//et模式下注册的事件只被触发了一次，所以需要一直读取完所有的数据
+       		//lt模式下注册的事件，计算应用这次不处理，下次还会再通知一次，所以et更高效，运行这个事例
+       		//就可以看到lt模式下"event trigger once"被输出了多次，而et模式下"event trigger once"
+       		//只输出了一次
         	lt(events, ret, epollfd, listenfd); // 使用LT模式
         	//et(events, ret, epollfd, listenfd); // 使用ET模式
         }
