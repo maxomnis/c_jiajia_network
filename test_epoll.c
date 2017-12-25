@@ -36,11 +36,12 @@ void addfd( int epollfd, int fd, bool enable_et )
 	event.events = EPOLLIN;	//注册可读事件, event.data 用户数据，实例这里没有用到；
 	if(enable_et)
 	{
-		event.events |= EPOLLET;
+		event.events |= EPOLLET;	//EPOLLET 启用ET模式
 	}
 
-	//将要交由内核管控的文件描述符加入epoll对象并设置触发条件
+	//往事件表epollfd注册（EPOLL_CTL_ADD指添加）文件描述符(fd)的可读事件(&evnet,上面设置为可读事件)
 	epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &event);
+
 	/*
 	EPOLL_CTL_ADD 往事件表中注册fd上的事件
 	EPOLL_CTL_MOD 修改fd上的注册事件
@@ -56,14 +57,20 @@ void lt( epoll_event* events , int number , int epollfd , int listenfd )
 	for(int i = 0 ; i < number; i++)
 	{
 		int sockfd = events[i].data.fd;
+
+		//客户端每新来一个链接都会触发这个，如果是已经连上的，然后发送消息的，不会触发这个
 		if(sockfd == listenfd )
 		{
 			struct sockaddr_in client_address;
 			socklen_t client_addrlength = sizeof(client_address);
 			int connfd = accept(listenfd, (struct sockaddr*)&client_address,
 											&client_addrlength);
+
+			//将该客户端链接，放到epollfd事件表
 			addfd(epollfd, connfd, false); /*对connfd禁用ET模式*/
 		}
+		
+		// 如果是已经连上了，然后发送消息的，就会触发这个
 		else if(events[i].events & EPOLLIN)
 		{
 			/*只要socket读缓存中还有未读出的数据，这段代码就被触发*/
@@ -92,8 +99,11 @@ void et(epoll_event* events, int number, int epollfd, int listenfd)
 	for( int i=0; i < number; i++)
 	{
 		int sockfd = events[i].data.fd;
+
+		//客户端每新来一个链接都会触发这个，如果是已经连上的，然后发送消息的，不会触发这个
 		if(sockfd == listenfd)
 		{
+			printf("sockfd == listenfd\n");	
 			struct sockaddr_in client_address;
 			socklen_t client_addrlength = sizeof(client_address);
 			int connfd = accept(listenfd, (struct sockaddr*)&client_address,
@@ -102,7 +112,7 @@ void et(epoll_event* events, int number, int epollfd, int listenfd)
 		}
 		else if(events[i].events & EPOLLIN)
 		{
-			/*这段代码不会被重复触发，所以我们循环读取数据，以确保把socket读缓存中的说有数据读出*/
+			/*这段代码只触发一次，所以我们循环读取数据，以确保把socket读缓存中的所有数据读出*/
 			printf("event trigger once\n");
 			while(1)
 			{
@@ -184,20 +194,22 @@ int main(int argc, char* argv[])
         epoll_event events[MAX_EVENT_NUMBER];
 
         //epoll_create在内核中创建用于存放epoll关心的文件描述符的事件表
-        int epollfd = epoll_create(5);  //size=5，这个参数并不起作用，只是给内核一个提示，告诉
-        //它，事件表需要多大
+        int epollfd = epoll_create(5);  
+        //size=5，这个参数并不起作用，只是给内核一个提示，告诉它，事件表需要多大
 
 
         assert(epollfd !=-1 );
 
         /*
-		将listenfd的事件,注册到内核事件表epollfd中
+			将listenfd文件描述符的可读事件,注册到内核事件表epollfd中
         */
         addfd(epollfd, listenfd, true);
 
         while(1)
         {
         	/*
+
+
  				在一段超时事件内等待一组文件描述符上的事件,成功时，返回就绪的文件数
         		epoll_wait函数如果检测到事件，就将所有就绪事件从内核事件表（由epollfd
         		参数指定）中复制到它第二个参数events指定的数组中。这个数组只用于输出
@@ -206,7 +218,11 @@ int main(int argc, char* argv[])
         		应用程序索引就绪文件的效率。
 
         		epoll_wait返回就绪的文件数
+
+        		进程一直阻塞在epoll_wait这里，等待文件描述符变的可读，等待文件描述符可读后，就
+        		执行epoll_wait后面的内容
         	*/
+
         	int ret = epoll_wait(epollfd, events, MAX_EVENT_NUMBER, -1);
         	if( ret < 0)
         	{
@@ -214,7 +230,13 @@ int main(int argc, char* argv[])
         		break;
         	}
 
-        	//体会下两个模式的区别
+       
+       		/*
+       		et模式下注册的事件只被触发了一次，所以需要一直读取完所有的数据
+       		lt模式下注册的事件，就算应用这次不处理，下次还会再通知一次，所以et更高效，运行这个事例
+       		就可以看到lt模式下"event trigger once"被输出了多次，而et模式下"event trigger once"
+       		只输出了一次
+       		*/
         	lt(events, ret, epollfd, listenfd); // 使用LT模式
         	//et(events, ret, epollfd, listenfd); // 使用ET模式
         }

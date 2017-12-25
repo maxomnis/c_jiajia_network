@@ -60,13 +60,15 @@ int main(int argc, char* argv[])
 	ret = bind(sock , (struct sockaddr*)&address, sizeof(address));
 	assert( ret != -1);
 
-	ret = listen(sock, 5);  //设置内核监听队列的最大长度为5，其实一般是接收比这个值大1的
+	ret = listen(sock, 5);  //设置内核监听队列 的最大长度为5，其实一般是接收比这个值大1的
 	assert( ret != -1);
 
 	struct sockaddr_in client;
 	socklen_t client_addrlength = sizeof(client);
 	
 	printf("start connect......\n");
+
+	//进程会卡在这里等待客户端的连接
 	int connfd = accept(sock, (struct sockaddr*)&client, &client_addrlength);
 	printf("end connect......\n");
 	if(connfd<0)
@@ -79,18 +81,31 @@ int main(int argc, char* argv[])
 
 		fd_set read_fds;
 		fd_set exception_fds;
+
+		/*
+
+		FD_ZERO(fd_set *fdset);将指定的文件描述符集清空，在对文件描述符集合进行设置前，必须对其进行初始化，
+		如果不清空，由于在系统分配内存空间后，通常并不作清空处理，所以结果是不可知的。
+		*/
 		FD_ZERO(&read_fds);  //
 		FD_ZERO(&exception_fds);
 		while(1)
 		{
 			memset(buffer, '\0', BUFF_SIZE);
+
 			/*
-			 每次调用select前都要重新在read_fds和exception_fds中设置文件描述符connfd，因为事件发生之后，
+				FD_SET(fd_set *fdset);用于在文件描述符集合中增加一个新的文件描述符
+			*/
+
+			/*
+			 每次调用select前都要重新在read_fds和exception_fds中设置文件描述符connfd，
+			 因为事件发生之后，
 			 文件描述符的集合将被内核修改
 			*/
-			FD_SET(connfd, &read_fds);
-			FD_SET(connfd, &exception_fds);
+			FD_SET(connfd, &read_fds);		//将connfd加入到集合read_fds中
+			FD_SET(connfd, &exception_fds);	//将connfd加入到集合exception_fds中
 			
+			//进程会阻塞在这里，等待客户端有信息发过来
 			ret = select(connfd+1, &read_fds, NULL, &exception_fds, NULL);
 			
 			if( ret <0 )
@@ -99,19 +114,25 @@ int main(int argc, char* argv[])
 				break;
 			}
 
-			/*对于可读事件，采用普通的recv函数读取数据*/
-			if(FD_ISSET(connfd, &read_fds))
+			/*
+				
+				FD_ISSET(int fd,fd_set *fdset)，用于测试指定的文件描述符是否在该集合中，
+
+			*/
+			//这里用于判断connfd，是否在可读列表(read_fdsz)中
+			if(FD_ISSET(connfd, &read_fds))			
 			{
+				//对于可读事件，采用普通的recv函数读取数据
 				ret = recv(connfd, buffer, sizeof(buffer)-1, 0 );
 				if(ret <=0 )
 				{
-					break;
+					break;		//如果没有收到数据，则跳出循环，进程return 0 ，进程结束
 				}
 				printf("get %d bytes of normal data:%s\n", ret, buffer);
 			}
 			else if(FD_ISSET(connfd, &exception_fds))
 			{
-				ret = recv(connfd, buffer, sizeof(buffer)-1, MSG_OOB);
+				ret = recv(connfd, buffer, sizeof(buffer)-1, MSG_OOB);	//MSG_OOB表示外带数据
 				if( ret<= 0)
 				{
 					break;
@@ -122,6 +143,6 @@ int main(int argc, char* argv[])
 		}	
 		close(connfd);
 		close(sock);
-		return 0;
+		return 0;	//进程退出
 }
 }
