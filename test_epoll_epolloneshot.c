@@ -209,7 +209,7 @@ int main(int argc, char* argv[])
        									&client_addrlength);
 
        				//对每个非监听文件描述符都注册到EPOLLONESHOT事件
-       				addfd(epollfd, connfd, false);
+       				addfd(epollfd, connfd, true);
        			}
        			else if(events[i].events & EPOLLIN)
        			{
