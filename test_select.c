@@ -101,11 +101,16 @@ int main(int argc, char* argv[])
 			 每次调用select前都要重新在read_fds和exception_fds中设置文件描述符connfd，
 			 因为事件发生之后，
 			 文件描述符的集合将被内核修改
+
+			 下面需要把connfd复制到read_fds，exception_fds，如果有可写列表，还要增加
+			 可写列表，但是epoll，只需要注册事件就行，不需要这样复制加到可读，可写，异常
+			 列表
 			*/
 			FD_SET(connfd, &read_fds);		//将connfd加入到集合read_fds中
 			FD_SET(connfd, &exception_fds);	//将connfd加入到集合exception_fds中
 			
-			//进程会阻塞在这里，等待客户端有信息发过来
+			//进程会阻塞在这里，等待客户端有信息发过来;如果有消息过来，就执行下面的recv
+			//等recv执行完之后，就进行下一次的while循环
 			ret = select(connfd+1, &read_fds, NULL, &exception_fds, NULL);
 			
 			if( ret <0 )
