@@ -21,6 +21,7 @@
 #define BUFFER_SIZE 64	//读缓冲区的大小
 #define FD_LIMIT 65535  //文件描述符数量限制
 
+
 //客户数据
 struct client_data
 {
@@ -90,6 +91,16 @@ int main(int argc, char* argv[])
 
 	client_data* users = new client_data[FD_LIMIT];
 
+	/*
+		struct pollfd
+		{
+		int fd;               //文件描述符
+		short events;        // 等待的事件
+		short revents;       // 实际发生了的事件
+		} ;
+
+	*/
+
 	//尽管我们分配了足够多的client_data对象，但为了提高poll性能，仍然需要限制用户的数量
 	pollfd fds[USER_LIMIT+1];
 
@@ -102,7 +113,7 @@ int main(int argc, char* argv[])
 	}
 
 	fds[0].fd = listenfd;
-	fds[0].events = POLLIN|POLLERR;
+	fds[0].events = POLLIN|POLLERR|POLLOUT;
 	fds[0].revents = 0;
 
 	while(1)
@@ -116,12 +127,13 @@ int main(int argc, char* argv[])
 
 		for(int i=0; i<user_counter+1; ++i)
 		{
-			if((fds[i].fd == listenfd) && (fds[i].revents & POLLIN))
+			if((fds[i].fd == listenfd) && (fds[i].revents & POLLIN))  //服务端有新连接过来,变得可读,POLLIN 可读
 			{
 				struct sockaddr_in client_address;
 				socklen_t client_addrlength = sizeof(client_address);
 				int connfd = accept(listenfd, (struct sockaddr*)&client_address,
 					&client_addrlength);
+
 				if(connfd<0)
 				{
 					printf("errno is :%d\n", errno);
@@ -151,7 +163,7 @@ int main(int argc, char* argv[])
 
 				printf("comes a new user, now have %d users\n", user_counter);
 			}
-			else if(fds[i].revents & POLLERR)
+			else if(fds[i].revents & POLLERR)  //POLLERR(出错)
 			{
 				printf("get an error from %d\n", fds[i].fd);
 				char errors[100];
@@ -175,7 +187,7 @@ int main(int argc, char* argv[])
 				printf("a client left");
 
 			}
-			else if(fds[i].revents & POLLIN)
+			else if(fds[i].revents & POLLIN)	//可读
 			{
 				int connfd = fds[i].fd;
 				memset(users[connfd].buf, '\0', BUFFER_SIZE);
@@ -218,7 +230,7 @@ int main(int argc, char* argv[])
 					}
 				}
 			} 
-			else if(fds[i].revents & POLLOUT)
+			else if(fds[i].revents & POLLOUT) 	//可写
 			{
 				int connfd = fds[i].fd;
 				if(!users[connfd].write_buf)
