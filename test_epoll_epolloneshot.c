@@ -190,7 +190,7 @@ int main(int argc, char* argv[])
         		执行epoll_wait后面的内容
         	*/
 
-        	int ret = epoll_wait(epollfd, events, MAX_EVENT_NUMBER, -1);
+        	int ret = epoll_wait(epollfd, events, MAX_EVENT_NUMBER, -1);  //-1表示一直等待，这里是超时时间设置，0表示立即返回，1表示等待1苗 再返回
         	if( ret < 0)
         	{
         		printf("epoll failure\n");
