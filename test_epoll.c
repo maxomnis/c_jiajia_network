@@ -12,6 +12,10 @@
 #include <sys/epoll.h>
 #include <pthread.h>
 
+/*
+ I/O复用函数本身是阻塞的，它们能提高程序效率是因为它们可以同时监听多个
+ i/o事件的能力
+*/
 #define MAX_EVENT_NUMBER 1024
 #define BUFFER_SIZE 10  //最多存放10个字节
 

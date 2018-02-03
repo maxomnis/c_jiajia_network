@@ -13,7 +13,14 @@
 #define BUFLEN 128
 #define SERV_PORT   8080
 
+/*
+高效的事件处理模式，reactor(反应堆模式)
 
+reactor是一种模式，它要求主线程i/o处理单元，只负责监听文件描述符上是否有事件发生，
+有的话就立即将该事件通知工作线程。除此之外，主线程不做任何其他实质性的工作。
+读写数据，接受新的连接，以及处理客户请求均在工作线程中完成.
+这个实例中，貌似并没有使用多线程
+*/
 /*
  * status:1表示在监听事件中，0表示不在 
  * last_active:记录最后一次响应时间,做超时处理
@@ -183,8 +190,10 @@ void senddata(int fd, int events, void *arg)
 void initlistensocket(int efd, short port)
 {
     int lfd = socket(AF_INET, SOCK_STREAM, 0);
-    fcntl(lfd, F_SETFL, O_NONBLOCK);
+    fcntl(lfd, F_SETFL, O_NONBLOCK); 
+
     eventset(&g_events[MAX_EVENTS], lfd, acceptconn, &g_events[MAX_EVENTS]);
+
     eventadd(efd, EPOLLIN, &g_events[MAX_EVENTS]);
 
     struct sockaddr_in sin;
@@ -208,6 +217,7 @@ int main(int argc, char *argv[])
     if (argc == 2)
         port = atoi(argv[1]);
 
+   //epoll_create在内核中创建用于存放epoll关心的文件描述符的事件表
     g_efd = epoll_create(MAX_EVENTS+1);
 
     if (g_efd <= 0)
